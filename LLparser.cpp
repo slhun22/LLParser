@@ -2,43 +2,60 @@
 
 #define UNDEFVALUE 10101
 
-LexAnalyzer lex;//lexical analyzer unit
-unordered_map<string, float> symbolTable;//심볼테이블
-vector<string> symbolOrderContainer;//symbolTable 자체는 순서대로 값을 저장하지 않아 별도로 순서대로 저장하는 sequence container 추가
-vector<string> sentenceContainer; //분석한 문장의 토큰을 가지고 있다가 subResult 출력 때 합쳐서 출력하는 용도
-queue<string> undefinedVariableQueue;//정의되지 않은 변수를 감지할 시 잠깐 보관해두는 큐. subResult 출력에 사용
-
-int idCount = 0;
-int constCount = 0;
-int opCount = 0;
-float rvalue = -1;
-
-//**중요 규칙 : terminal symbol을 읽으면(함수 call) 바로 다음줄에 lexical 함수를 부를 것, nonterminal symbol을 읽으면(함수 call) lexical 함수를 부르지 않음. 
-
-void printSubResult()
+void LLparser::printSubResult()
 {
+	bool isOK = true;
 	string line = "";
 	for (string iter : sentenceContainer)
 		line.append(iter + " ");
 	cout << line << "\n";
 	cout << "ID: " << idCount << "; " << "CONST: " << constCount << "; " << "OP: " << opCount << ";\n";
-	//cout << "(OK)\n";
-	//ok, warning, error 관련 상당히 긴 예외처리문이 필요할 듯 
+
+	if (isAddOpRedundant) cout << "(Warning) \"중복 연산자(+) 제거\"\n";
+	if (isSubOpRedundant) cout << "(Warning) \"중복 연산자(-) 제거\"\n";
+	if (isMulOpRedundant) cout << "(Warning) \"중복 연산자(*) 제거\"\n";
+	if (isDivOpRedundant) cout << "(Warning) \"중복 연산자(/) 제거\"\n";
+	
+	if (isSemiColonRedundant) cout << "(Warning) \"중복 세미콜론 제거\"\n";
+
+	if (isSemiColonWrongPlace) cout << "(Warning) \"마지막 문장의 불필요한 세미콜론 제거\"\n";
+
+	lex.printLexErrors();
+
+	if (isError)
+	{
+		cout << "(Error) \"문법에 맞지 않는 문장입니다. (복구 불가능)\"\n";
+		symbolTable[lvalue] = UNDEFVALUE;
+	}		
+
+	if (isAddOpRedundant || isSubOpRedundant || isMulOpRedundant || isDivOpRedundant || isSemiColonRedundant || isSemiColonWrongPlace || isError) isOK = false;
+
 	while (!undefinedVariableQueue.empty())
 	{
 		cout << "(Error) \"정의되지 않은 변수(";
 		cout << undefinedVariableQueue.front();
 		cout << ")가 참조됨\"\n";
 		undefinedVariableQueue.pop();
+		isOK = false;
 	}
+
+	if (isOK) 
+		cout << "(OK)\n";
 
 	idCount = 0;
 	constCount = 0;
 	opCount = 0;
+	isAddOpRedundant = false;
+	isSubOpRedundant = false;
+	isMulOpRedundant = false;
+	isDivOpRedundant = false;
+	isSemiColonRedundant = false;
+	isSemiColonWrongPlace = false;
+	isError = false;
 	sentenceContainer.clear();
 }
 
-void printFinalResult()
+void LLparser::printFinalResult()
 {
 	cout << "Result ==> ";
 	for (auto iter : symbolOrderContainer)
@@ -51,52 +68,64 @@ void printFinalResult()
 	cout << "\n";
 }
 
-void left_paren()//<left_paren> → (                                    
+void LLparser::error()//복구 불가 에러 대응 함수
+{
+	isError = true;
+	sentenceContainer.push_back(lex.getTokenString());
+}
+
+void LLparser::left_paren()//<left_paren> → (                                    
 {
 	sentenceContainer.push_back(lex.getTokenString());
 }
 
-void right_paren()//<right_paren> → )                                 
+void LLparser::right_paren()//<right_paren> → )                                 
 {
 	sentenceContainer.push_back(lex.getTokenString());
 }
 
-void mult_op()//<mult_operator> → * | /                                
+void LLparser::mult_op()//<mult_operator> → * | /                                
 {
 	sentenceContainer.push_back(lex.getTokenString());
 	opCount++;
 }
 
-void add_op()//<add_operator> → + | -      
+void LLparser::add_op()//<add_operator> → + | -      
 {
 	sentenceContainer.push_back(lex.getTokenString());
 	opCount++;
 }
 
-void semi_colon()//<semi_colon> → ;                                  
+void LLparser::semi_colon()//<semi_colon> → ;                                  
 {
 	sentenceContainer.push_back(lex.getTokenString());
+	lex.lexical();
+	if (lex.getTokenString() == ";")//세미콜론 중복 확인
+	{
+		isSemiColonRedundant = true;
+		lex.lexical();
+	}
 	printSubResult();
 }
 
-void assignment_op()//<assignment_op> → :=                       
+void LLparser::assignment_op()//<assignment_op> → :=                       
 {
 	sentenceContainer.push_back(lex.getTokenString());
 }
 
-void ident()//<ident> → any names conforming to C identifier rules    
+void LLparser::ident()//<ident> → any names conforming to C identifier rules    
 {
 	sentenceContainer.push_back(lex.getTokenString());
 	idCount++;
 }
 
-void constant()//<const> → any decimal numbers                       
+void LLparser::constant()//<const> → any decimal numbers                       
 {
 	sentenceContainer.push_back(lex.getTokenString());
 	constCount++;
 }
 
-float factor()//<factor> → <left_paren><expression><right_paren> | <ident> | <const>
+float LLparser::factor()//<factor> → <left_paren><expression><right_paren> | <ident> | <const>
 {
 	float v1;
 	switch (lex.getNextToken())
@@ -104,6 +133,7 @@ float factor()//<factor> → <left_paren><expression><right_paren> | <ident> | <c
 	case LEFT_P:
 		left_paren();
 		lex.lexical();
+		//왼 괄호 중복 시 제거 후 boolean으로 따로 값 넘겨서 마지막 subresult 떄 불값에 따라 warning log 출력 //OK 나 error 관련해서도 radiobutton처럼 bool값 필요
 		v1 = expression();
 		if (lex.getNextToken() == RIGHT_P)
 		{
@@ -112,7 +142,7 @@ float factor()//<factor> → <left_paren><expression><right_paren> | <ident> | <c
 		}
 		else
 		{
-			//error
+			error();
 		}
 		break;
 	case IDENT:
@@ -133,12 +163,14 @@ float factor()//<factor> → <left_paren><expression><right_paren> | <ident> | <c
 		constant();
 		return stof(lex.getTokenString());
 		break;
-	default: //error?
+	default:
+		error();
+		//return UNDEFVALUE;
 		break;
 	}
 }
 
-float factor_tail(float beforeFactor)//<factor_tail> → <mult_op><factor><factor_tail> | ε
+float LLparser::factor_tail(float beforeFactor)//<factor_tail> → <mult_op><factor><factor_tail> | ε
 {
 	string op;
 	float v1, result;
@@ -148,6 +180,14 @@ float factor_tail(float beforeFactor)//<factor_tail> → <mult_op><factor><factor
 		mult_op();
 		op = lex.getTokenString();
 		lex.lexical();
+		if (op == lex.getTokenString())//곱셈나눗셈 중복 확인
+		{
+			if (op == "*")
+				isMulOpRedundant = true;
+			else
+				isDivOpRedundant = true;
+			lex.lexical();
+		}
 		v1 = factor();
 		lex.lexical();
 
@@ -168,7 +208,7 @@ float factor_tail(float beforeFactor)//<factor_tail> → <mult_op><factor><factor
 	}
 }
 
-float term()//<term> → <factor> <factor_tail>
+float LLparser::term()//<term> → <factor> <factor_tail>
 {
 	float temp;
 	float v1 = factor();
@@ -177,7 +217,7 @@ float term()//<term> → <factor> <factor_tail>
 	return v2;
 }
 
-float term_tail(float beforeTerm)//<term_tail> → <add_op><term><term_tail> | ε
+float LLparser::term_tail(float beforeTerm)//<term_tail> → <add_op><term><term_tail> | ε
 {
 	string op;
 	float v1, result;
@@ -187,6 +227,14 @@ float term_tail(float beforeTerm)//<term_tail> → <add_op><term><term_tail> | ε
 		add_op();
 		op = lex.getTokenString();
 		lex.lexical();
+		if (op == lex.getTokenString())//덧셈뺄셈 중복 확인
+		{
+			if (op == "+")
+				isAddOpRedundant = true;
+			else
+				isSubOpRedundant = true;
+			lex.lexical();
+		}
 		v1 = term();
 		if (v1 == UNDEFVALUE || beforeTerm == UNDEFVALUE)
 			result = UNDEFVALUE;
@@ -205,16 +253,15 @@ float term_tail(float beforeTerm)//<term_tail> → <add_op><term><term_tail> | ε
 	}
 }
 
-float expression()//<expression> → <term><term_tail>
+float LLparser::expression()//<expression> → <term><term_tail>
 {
 	float v1 = term();
 	float v2 = term_tail(v1);
 	return v2;
 }
 
-void statement()//<statement> → <ident><assignment_op><expression>
+void LLparser::statement()//<statement> → <ident><assignment_op><expression>
 {
-	string lvalue;
 	float rvalue;
 	switch (lex.getNextToken())
 	{
@@ -237,48 +284,47 @@ void statement()//<statement> → <ident><assignment_op><expression>
 		}
 		else
 		{
-			//error
+			error();
 			break;
 		}
 		break;
 
 	default : 
-		//error
+		error();
 		break;
 	}
 	
 }
 
-void statements()//<statements> → <statement> | <statement><semi_colon><statements>
+void LLparser::statements()//<statements> → <statement> | <statement><semi_colon><statements>
 {
 	statement();
+
 	switch (lex.getNextToken())
 	{
 	case SEMI_COLON : 
+		if (lex.checkNextTokenString() == "$") //마지막 문장인데 세미콜론이 붙어있는 경우
+		{
+			isSemiColonWrongPlace = true;
+			return;
+		}
 		semi_colon();
-		lex.lexical();
+		//lex.lexical();   //세미콜론만 예외처리 구조상 semi_colon 함수 내부에 lexical함수를 넣었음.
 		statements();
 		break;
 	case END:
 		break;
 	default :
-		//error
+		error();
 		break;
 	}
 }
 
-void program()//<program> → <statements>
+void LLparser::program()//<program> → <statements>
 {
 	lex.lexical();//initial lexical before start parsing
 	statements();
 	//트리 순회 끝
 	printSubResult();
 	printFinalResult();
-}
-
-int main()
-{
-	lex.loadFileData();
-	lex.tokenize();
-	program();
 }

@@ -31,8 +31,9 @@ void LexAnalyzer::lexical()
 		{
 			if (!(isdigit(token_string[i]) || isalpha(token_string[i]) || token_string[i] == '$'))//C언어 identifier rule을 어기는 경우
 			{
-				cout << "(Error) \"허용되지 않는 변수명입니다.\"\n";
+				lexicalErrorContainer.push("(Error) \"허용되지 않는 변수명입니다.(" + token_string + ")\"\n");
 				isLegal = false;
+				next_token = ERROR;
 				break;
 			}
 		}
@@ -47,8 +48,9 @@ void LexAnalyzer::lexical()
 		{
 			if (!isdigit(token_string[i]))
 			{
-				cout << "(Error) \"잘못된 상수입니다.\"\n";
+				lexicalErrorContainer.push("(Error) \"잘못된 상수입니다.(" + token_string + ")\"\n");
 				isLegal = false;
+				next_token = ERROR;
 				break;
 			}
 		}
@@ -56,7 +58,7 @@ void LexAnalyzer::lexical()
 		if (isLegal)
 			next_token = CONST;
 	}
-	else//연산자
+	else//연산자 또는 사용하는 기호
 	{
 		if (token_string == "+" || token_string == "-") next_token = ADD_OP;
 		else if (token_string == "*" || token_string == "/") next_token = MUL_OP;
@@ -66,7 +68,10 @@ void LexAnalyzer::lexical()
 		else if (token_string == ")") next_token = RIGHT_P;
 		else if (token_string == "$") next_token = END;
 		else
-			cout << "(Error) \"알 수 없는 기호입니다.\"\n";
+		{
+			lexicalErrorContainer.push("(Error) \"알 수 없는 기호입니다.(" + token_string + ")\"\n");
+			next_token = ERROR;
+		}
 	}
 
 	//cout << "string : " << getTokenString() << "\t token: " << getNextToken() << "\n";
@@ -84,9 +89,9 @@ void LexAnalyzer::tokenize()
 	q.push("$");
 }
 
-void LexAnalyzer::loadFileData()
+void LexAnalyzer::loadFileData(string filename)
 {
-	ifstream f("eval1.txt");
+	ifstream f(filename);
 	if (f.is_open())
 	{
 		f.seekg(0, std::ios::end);// 위치 지정자를 파일 끝으로 옮긴다.
@@ -110,3 +115,26 @@ void LexAnalyzer::loadFileData()
 
 int LexAnalyzer::getNextToken() { return next_token; }
 string LexAnalyzer::getTokenString() { return token_string; }
+
+void LexAnalyzer::printLexErrors() 
+{
+	while (!lexicalErrorContainer.empty())
+	{
+		cout << lexicalErrorContainer.front();
+		lexicalErrorContainer.pop();
+	}
+}
+
+string LexAnalyzer::checkNextTokenString()
+{
+	return q.front();
+}
+
+void LexAnalyzer::printAllTokens()
+{
+	while (q.front() != "$")
+	{
+		cout << "\"" << q.front() << "\"\n";
+		q.pop();
+	}
+}
