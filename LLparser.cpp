@@ -20,9 +20,7 @@ void LLparser::printSubResult()
 
 	if (isSemiColonWrongPlace) cout << "(Warning) \"마지막 문장의 불필요한 세미콜론 제거\"\n";
 
-	lex.printLexErrors();
-
-	if (isError)
+	if (isError || lex.printLexErrors() > 0)
 	{
 		cout << "(Error) \"문법에 맞지 않는 문장입니다. (복구 불가능)\"\n";
 		symbolTable[lvalue] = UNDEFVALUE;
@@ -68,10 +66,12 @@ void LLparser::printFinalResult()
 	cout << "\n";
 }
 
+
+
 void LLparser::error()//복구 불가 에러 대응 함수
 {
 	isError = true;
-	sentenceContainer.push_back(lex.getTokenString());
+	//sentenceContainer.push_back(lex.getTokenString());
 }
 
 void LLparser::left_paren()//<left_paren> → (                                    
@@ -127,6 +127,8 @@ void LLparser::constant()//<const> → any decimal numbers
 
 float LLparser::factor()//<factor> → <left_paren><expression><right_paren> | <ident> | <const>
 {
+	if (isError) return UNDEFVALUE;
+
 	float v1;
 	switch (lex.getNextToken())
 	{
@@ -143,6 +145,7 @@ float LLparser::factor()//<factor> → <left_paren><expression><right_paren> | <i
 		else
 		{
 			error();
+			return UNDEFVALUE;
 		}
 		break;
 	case IDENT:
@@ -165,13 +168,15 @@ float LLparser::factor()//<factor> → <left_paren><expression><right_paren> | <i
 		break;
 	default:
 		error();
-		//return UNDEFVALUE;
+		return UNDEFVALUE;
 		break;
 	}
 }
 
 float LLparser::factor_tail(float beforeFactor)//<factor_tail> → <mult_op><factor><factor_tail> | ε
 {
+	if (isError) return UNDEFVALUE;
+
 	string op;
 	float v1, result;
 	switch (lex.getNextToken())
@@ -210,7 +215,8 @@ float LLparser::factor_tail(float beforeFactor)//<factor_tail> → <mult_op><fact
 
 float LLparser::term()//<term> → <factor> <factor_tail>
 {
-	float temp;
+	if (isError) return UNDEFVALUE;
+
 	float v1 = factor();
 	lex.lexical();
 	float v2 = factor_tail(v1);
@@ -219,6 +225,8 @@ float LLparser::term()//<term> → <factor> <factor_tail>
 
 float LLparser::term_tail(float beforeTerm)//<term_tail> → <add_op><term><term_tail> | ε
 {
+	if (isError) return UNDEFVALUE;
+
 	string op;
 	float v1, result;
 	switch (lex.getNextToken())
@@ -255,6 +263,8 @@ float LLparser::term_tail(float beforeTerm)//<term_tail> → <add_op><term><term_
 
 float LLparser::expression()//<expression> → <term><term_tail>
 {
+	if (isError) return UNDEFVALUE;
+
 	float v1 = term();
 	float v2 = term_tail(v1);
 	return v2;
@@ -262,6 +272,8 @@ float LLparser::expression()//<expression> → <term><term_tail>
 
 void LLparser::statement()//<statement> → <ident><assignment_op><expression>
 {
+	if (isError) return;
+
 	float rvalue;
 	switch (lex.getNextToken())
 	{
@@ -299,6 +311,12 @@ void LLparser::statement()//<statement> → <ident><assignment_op><expression>
 void LLparser::statements()//<statements> → <statement> | <statement><semi_colon><statements>
 {
 	statement();
+	
+	while (lex.getNextToken() != SEMI_COLON && lex.getNextToken() != END) // 문법 구조 오류 시 프로그램이 token이 남았음에도 종료되는 현상 방지를 위해 추가한 코드 
+	{	
+		sentenceContainer.push_back(lex.getTokenString());
+		lex.lexical();
+	}
 
 	switch (lex.getNextToken())
 	{

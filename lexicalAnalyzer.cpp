@@ -43,10 +43,14 @@ void LexAnalyzer::lexical()
 	}
 	else if (isdigit(token_string[0]))//decimal number
 	{
+		int dotNumLeft = 1;
 		isLegal = true;
 		for (int i = 1; i < token_string.length(); i++)
 		{
-			if (!isdigit(token_string[i]))
+			if (token_string[i] == '.')
+				dotNumLeft--;
+
+			else if (!isdigit(token_string[i]) || dotNumLeft < 0)
 			{
 				lexicalErrorContainer.push("(Error) \"잘못된 상수입니다.(" + token_string + ")\"\n");
 				isLegal = false;
@@ -116,13 +120,16 @@ void LexAnalyzer::loadFileData(string filename)
 int LexAnalyzer::getNextToken() { return next_token; }
 string LexAnalyzer::getTokenString() { return token_string; }
 
-void LexAnalyzer::printLexErrors() 
+int LexAnalyzer::printLexErrors() 
 {
+	int cnt = 0;
 	while (!lexicalErrorContainer.empty())
 	{
 		cout << lexicalErrorContainer.front();
 		lexicalErrorContainer.pop();
+		cnt++;
 	}
+	return cnt;
 }
 
 string LexAnalyzer::checkNextTokenString()

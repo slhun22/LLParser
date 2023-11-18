@@ -29,7 +29,7 @@ public:
 	int getNextToken();//next_token 반환
 	string getTokenString();//token_string반환
 	string checkNextTokenString();//다음 스트링 미리 보기
-	void printLexErrors();//에러 큐에 있는 에러 내용 전부 꺼내서 출력하기
+	int printLexErrors();//에러 큐에 있는 에러 내용 전부 꺼내서 출력하기
 private:
 	int next_token = 0;
 	string token_string;

@@ -6,7 +6,6 @@ int main(int argc, char* argv[])
 	const string option = "-v";
 	if (!option.compare(argv[1]))
 	{
-		cout << argv[2] << endl;
 		parser.lex.loadFileData(argv[2]);
 		parser.lex.tokenize();
 		parser.lex.printAllTokens();
