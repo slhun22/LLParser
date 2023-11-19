@@ -20,7 +20,7 @@ void LLparser::printSubResult()
 
 	if (isSemiColonWrongPlace) cout << "(Warning) \"마지막 문장의 불필요한 세미콜론 제거\"\n";
 
-	if (isError || lex.printLexErrors() > 0)
+	if (lex.printLexErrors() > 0 || isError)
 	{
 		cout << "(Error) \"문법에 맞지 않는 문장입니다. (복구 불가능)\"\n";
 		symbolTable[lvalue] = UNDEFVALUE;
